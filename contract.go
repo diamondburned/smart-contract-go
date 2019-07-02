@@ -1,18 +1,25 @@
 package smartcontract
 
+import "gitlab.com/diamondburned/smart-contract-go/internal/encode"
+
 type Contract struct {
 	Payload []byte
 	Code    []byte
 }
 
-func ReadFromContract(buf []byte) *Contract {
-	return &Contract{
-		Payload: ReadBody(buf),
-		Code:    buf,
+func ReadFromContract(buf []byte) (*Contract, error) {
+	b, err := encode.CutBody(buf)
+	if err != nil {
+		return nil, err
 	}
+
+	return &Contract{
+		Payload: b,
+		Code:    buf,
+	}, nil
 }
 
 func (c *Contract) WriteTo(buf []byte) {
-	buf = WriteBody(buf, c.Payload)
+	buf = encode.AppendBody(buf, c.Payload)
 	buf = append(buf, c.Code...)
 }

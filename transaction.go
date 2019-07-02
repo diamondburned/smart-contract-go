@@ -1,6 +1,13 @@
 package smartcontract
 
-import "encoding/binary"
+import (
+	"io"
+
+	"gitlab.com/diamondburned/smart-contract-go/internal/binary"
+	"gitlab.com/diamondburned/smart-contract-go/internal/encode"
+	"gitlab.com/diamondburned/smart-contract-go/internal/errors"
+	"gitlab.com/diamondburned/smart-contract-go/internal/utils"
+)
 
 type TransactionTag uint8
 
@@ -12,13 +19,13 @@ const (
 )
 
 type Transaction interface {
-	Write() []byte
+	Encode() []byte
 	Tag() TransactionTag
 }
 
 func SendTransaction(t Transaction) {
-	buf := t.Write()
-	_send_transaction(byte(t.Tag()), &buf[0], uint32(len(buf)))
+	b := t.Encode()
+	_send_transaction(byte(t.Tag()), &b[0], uint32(len(b)))
 }
 
 type Transfer struct {
@@ -29,47 +36,86 @@ type Transfer struct {
 	FuncParams string
 }
 
-func ReadFromTransfer(buf []byte) *Transfer {
-	t := Transfer{}
-
-	copy(t.Destination[:], buf)
-	buf = buf[32:]
-
-	t.Amount = binary.LittleEndian.Uint64(buf)
-	buf = buf[4:]
-
-	if len(buf) > 0 {
-		t.FuncName = string(ReadBody(buf))
-	}
-
-	if len(buf) > 0 {
-		t.FuncParams = string(ReadBody(buf))
-	}
-
-	return &t
+func NewTransfer(destination [32]byte, amount uint64) *Transfer {
+	return &Transfer{destination, amount, "", ""}
 }
 
+func ReadFromTransfer(buf []byte) (*Transfer, error) {
+	t := Transfer{}
+
+	if err := utils.Cut(t.Destination[:], buf); err != nil {
+		return nil, errors.Wrap("Failed to write the destination", err)
+	}
+
+	a, err := binary.CutUint64(buf)
+	if err != nil {
+		return nil, errors.Wrap("Failed to read the amount", err)
+	}
+
+	t.Amount = a
+
+	if len(buf) > 0 {
+		b, err := encode.CutBody(buf)
+		if err != nil {
+			return nil, errors.Wrap("Failed to read function name", err)
+		}
+
+		t.FuncName = string(b)
+	}
+
+	if len(buf) > 0 {
+		b, err := encode.CutBody(buf)
+		if err != nil {
+			return nil, errors.Wrap("Failed to read function params", err)
+		}
+
+		t.FuncParams = string(b)
+	}
+
+	return &t, nil
+}
+
+func (t *Transfer) SetFunction(name, params string) {
+	t.FuncName = name
+	t.FuncParams = params
+}
+
+// Methods to satisfy the Transaction interface
 var _ Transaction = (*Transfer)(nil)
 
 func (t *Transfer) Tag() TransactionTag {
 	return TagTransfer
 }
 
-func (t *Transfer) Write() (buf []byte) {
-	buf = make([]byte, 0,
-		len(t.Destination)+8+len(t.FuncName)+len(t.FuncParams),
+func (t *Transfer) Encode() []byte {
+	buf := make([]byte,
+		len(t.Destination)+8*2+len(t.FuncName)+len(t.FuncParams),
 	)
 
 	// Write the destination
-	buf = append(buf, t.Destination[:]...)
-
-	// Write the amount
-	binary.LittleEndian.PutUint64(buf, t.Amount)
-
-	if len(t.FuncName) > 0 && len(t.FuncParams) > 0 {
-		buf = append(buf, []byte(t.FuncName)...)
-		buf = append(buf, []byte(t.FuncParams)...)
+	if err := utils.Copy(buf, t.Destination[:]); err != nil {
+		panic(errors.Wrap("Failed to write the destination", io.ErrShortWrite))
 	}
 
-	return
+	// Write the amount
+	if err := binary.PutUint64(buf, t.Amount); err != nil {
+		panic(errors.Wrap("Failed to write the amount", err))
+	}
+
+	// Write a dummy gas amount
+	if err := binary.PutUint64(buf, 0); err != nil {
+		panic(errors.Wrap("Failed to write the gas amount", err))
+	}
+
+	if len(t.FuncName) > 0 && len(t.FuncParams) > 0 {
+		if err := utils.Copy(buf, []byte(t.FuncName)); err != nil {
+			panic(errors.Wrap("Failed to write function name", io.ErrShortWrite))
+		}
+
+		if err := utils.Copy(buf, []byte(t.FuncParams)); err != nil {
+			panic(errors.Wrap("Failed to write function params", io.ErrShortWrite))
+		}
+	}
+
+	return buf
 }
