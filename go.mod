@@ -1,3 +1,3 @@
-module gitlab.com/diamondburned/smart-contract-go
+module github.com/diamondburned/smart-contract-go
 
 go 1.12
