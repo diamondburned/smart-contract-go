@@ -3,10 +3,10 @@ package smartcontract
 import (
 	"io"
 
-	"gitlab.com/diamondburned/smart-contract-go/internal/binary"
-	"gitlab.com/diamondburned/smart-contract-go/internal/encode"
-	"gitlab.com/diamondburned/smart-contract-go/internal/errors"
-	"gitlab.com/diamondburned/smart-contract-go/internal/utils"
+	"./internal/binary"
+	"./internal/encode"
+	"./internal/errors"
+	"./internal/utils"
 )
 
 type TransactionTag uint8

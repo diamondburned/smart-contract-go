@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	"gitlab.com/diamondburned/smart-contract-go/internal/utils"
+	"../utils"
 )
 
 // CutBody pops the body out, slicing the buf.

@@ -1,9 +1,9 @@
 package smartcontract
 
 import (
-	"gitlab.com/diamondburned/smart-contract-go/internal/binary"
-	"gitlab.com/diamondburned/smart-contract-go/internal/errors"
-	"gitlab.com/diamondburned/smart-contract-go/internal/utils"
+	"./internal/binary"
+	"./internal/errors"
+	"./internal/utils"
 )
 
 type Parameters struct {
@@ -12,41 +12,43 @@ type Parameters struct {
 	TransactionID [32]byte
 	Sender        [32]byte
 	Amount        uint64
+
+	buf []byte
 }
 
 func Load() (*Parameters, error) {
 	// Get the payload length
 	payloadLen := _payload_len()
 
-	// Make a byte slice of that length
-	payload := make([]byte, payloadLen)
+	p := Parameters{
+		// Make a byte slice of that length
+		buf: make([]byte, payloadLen),
+	}
 
 	// Pass in the byte slice, C style
-	_payload(&payload[0])
-
-	p := Parameters{}
+	_payload(&p.buf[0])
 
 	// Read round idx
-	u, err := binary.CutUint64(payload)
+	u, err := binary.CutUint64(p.buf)
 	if err != nil {
 		return nil, err
 	}
 
 	p.RoundIDX = u
 
-	if err := utils.Cut(p.RoundID[:], payload); err != nil {
+	if err := utils.Cut(p.RoundID[:], p.buf); err != nil {
 		return nil, err
 	}
 
-	if err := utils.Cut(p.TransactionID[:], payload); err != nil {
+	if err := utils.Cut(p.TransactionID[:], p.buf); err != nil {
 		return nil, err
 	}
 
-	if err := utils.Cut(p.Sender[:], payload); err != nil {
+	if err := utils.Cut(p.Sender[:], p.buf); err != nil {
 		return nil, err
 	}
 
-	u, err = binary.CutUint64(payload)
+	u, err = binary.CutUint64(p.buf)
 	if err != nil {
 		return nil, errors.Wrap("Failed to read amount", err)
 	}

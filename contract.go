@@ -1,6 +1,6 @@
 package smartcontract
 
-import "gitlab.com/diamondburned/smart-contract-go/internal/encode"
+import "./internal/encode"
 
 type Contract struct {
 	Payload []byte
